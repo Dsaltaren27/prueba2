@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 
 const usuariosRouter = require('./routes/usuarios');
+const authRouter = require('./routes/auth');
 
 const app = express();
 
@@ -9,6 +10,9 @@ const app = express();
 app.use(cors({ origin: 'http://localhost:4200' }));
 app.use(express.json()); // parsea el body automáticamente
 
+
+// Rutas públicas
+app.use('/auth',authRouter);
 // Rutas
 app.use('/usuarios', usuariosRouter);
 
