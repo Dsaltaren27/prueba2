@@ -1,32 +1,20 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { SECRET } = require('../middlewares/auth');
+const usuariosRepo = require('../repositories/usuarios');
 
-// Base de datos simulada — después conectamos PostgreSQL
-const usuariosDB = [
-  {
-    id: 1,
-    nombre: 'Ana',
-    email: 'ana@email.com',
-    // "password123" hasheada con bcrypt
-    password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'
-  }
-];
-
-async function login(req, res) {
+async function login(req, res, next) {
+  try{
   const { email, password } = req.body;
 
   // 1. Buscar usuario
-  const usuario = usuariosDB.find(u => u.email === email);
-  if (!usuario) {
-    return res.status(401).json({ error: 'Credenciales inválidas' });
-  }
+  const usuario = await usuariosRepo.findByEmail(email);
+  if (!usuario) throw new AppError('Credenciales inválidas', 401);
 
   // 2. Verificar password
   const passwordValida = await bcrypt.compare(password, usuario.password);
-  if (!passwordValida) {
-    return res.status(401).json({ error: 'Credenciales inválidas' });
-  }
+  if (!passwordValida) throw new AppError('Credenciales inválidas', 401);
+  
 
   // 3. Generar token
   const token = jwt.sign(
@@ -34,31 +22,28 @@ async function login(req, res) {
     SECRET,
     { expiresIn: '1h' }
   );
+  
 
   res.json({ token, usuario: { id: usuario.id, nombre: usuario.nombre } });
 }
+catch(error){
+  next(error);
+}
 
-async function registro(req, res) {
+}
+async function registro(req, res, next) {
+  try{
   const { nombre, email, password } = req.body;
 
   // Verificar si ya existe
-  const existe = usuariosDB.find(u => u.email === email);
-  if (existe) {
-    return res.status(409).json({ error: 'El email ya está registrado' });
-  }
-
+  const existe = await usuariosRepo.findByEmail(email);
+  if (existe) throw new AppError('El email ya está registrado', 409);
+    
   // Hashear password
   const hash = await bcrypt.hash(password, 10);
-
-  const nuevoUsuario = {
-    id: usuariosDB.length + 1,
-    nombre,
-    email,
-    password: hash
-  };
-
-  usuariosDB.push(nuevoUsuario);
-
+  // Crear usuario
+  const nuevoUsuario = await usuariosRepo.create(nombre,email,hash);
+  // Generar token
   const token = jwt.sign(
     { id: nuevoUsuario.id, email: nuevoUsuario.email, nombre: nuevoUsuario.nombre },
     SECRET,
@@ -70,5 +55,8 @@ async function registro(req, res) {
     usuario: { id: nuevoUsuario.id, nombre: nuevoUsuario.nombre } 
   });
 }
-
+catch(error){
+  next(error);
+}
+}
 module.exports = { login, registro };
